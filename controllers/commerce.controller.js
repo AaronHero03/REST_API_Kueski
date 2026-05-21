@@ -1,28 +1,6 @@
-// src/controllers/commerce.controller.js
+import db from "../config/database.js";
 
-// Traemos nuestra base de datos simulada (solo para este módulo)
-const STORES_DB = {
-	"amazon.com.mx": {
-		id: "store_001",
-		name: "Amazon México",
-		cashback: 2,
-		affiliated: true,
-	},
-	"mercadolibre.com.mx": {
-		id: "stores_002",
-		name: "Mercado Libre",
-		affiliated: false,
-	},
-	"expedia.mx": {
-		id: "stores_003",
-		name: "Expedia",
-		cashback: 1,
-		affiliated: true,
-	},
-};
-
-// Exportamos la función que hace el trabajo
-const checkBenefits = (req, res) => {
+const checkBenefits = async (req, res) => {
 	try {
 		const domain = req.query.domain;
 
@@ -33,31 +11,29 @@ const checkBenefits = (req, res) => {
 			});
 		}
 
-		const store = STORES_DB[domain.toLowerCase()];
+		const [rows] = await db.execute(
+			"SELECT cashback_rate FROM TIENDAS_PARTNER WHERE dominio = ?",
+			[domain.toLowerCase()]
+		);
 
-		if (store && store.affiliated) {
-			return res.status(200).json({
-				status: "success",
-				data: { is_partner: true, cashback_percentage: store.cashback },
-			});
+		if (!rows.length) {
+			return res.status(200).json({ status: "success", data: { is_partner: false } });
 		}
 
-		return res.status(200).json({
+		res.status(200).json({
 			status: "success",
-			data: { is_partner: false },
+			data: { is_partner: true, cashback_percentage: rows[0].cashback_rate },
 		});
 	} catch (error) {
-		// Aquí empezamos a meter manejo de errores (Try/Catch)
 		console.error("Error en checkBenefits:", error);
-		res
-			.status(500)
-			.json({ status: "error", message: "Error interno del servidor" });
+		res.status(500).json({ status: "error", message: "Error interno del servidor" });
 	}
 };
 
-const simulateTransaction = (req, res) => {
+const simulateTransaction = async (req, res) => {
 	try {
 		const { monto, id_partner } = req.body;
+		const { id_cliente } = req.user;
 
 		if (!monto || !id_partner) {
 			return res.status(400).json({
@@ -66,11 +42,28 @@ const simulateTransaction = (req, res) => {
 			});
 		}
 
-		const user_balance = 12500.5;
-		const user_cashback = 450.25;
+		const [[cuentaRows], [cashbackRows], [partnerRows]] = await Promise.all([
+			db.execute(
+				"SELECT saldo FROM CUENTA WHERE id_cliente = ? AND estado = 'activo'",
+				[id_cliente]
+			),
+			db.execute(
+				"SELECT monto_aprobado FROM BALANCE_CASHBACK WHERE id_cliente = ?",
+				[id_cliente]
+			),
+			db.execute(
+				"SELECT cashback_rate FROM TIENDAS_PARTNER WHERE id_partner = ?",
+				[id_partner]
+			),
+		]);
 
-		const store = Object.values(STORES_DB).find((s) => s.id === id_partner);
-		const cashback_rate = store && store.affiliated ? (store.cashback || 0) / 100 : 0;
+		if (!cuentaRows[0]) {
+			return res.status(404).json({ status: "error", message: "No se encontró la cuenta del usuario." });
+		}
+
+		const user_balance = Number(cuentaRows[0].saldo);
+		const user_cashback = Number(cashbackRows[0]?.monto_aprobado ?? 0);
+		const cashback_rate = partnerRows[0] ? Number(partnerRows[0].cashback_rate) / 100 : 0;
 		const cashback_to_earn = parseFloat((monto * cashback_rate).toFixed(2));
 
 		const plazos = [3, 6, 12];
@@ -83,12 +76,10 @@ const simulateTransaction = (req, res) => {
 			return { cuotas, monto_cuota: cuota, total: parseFloat((cuota * cuotas).toFixed(2)) };
 		});
 
-		const is_approved = monto <= user_balance + user_cashback;
-
 		res.status(200).json({
 			status: "success",
 			data: {
-				is_approved,
+				is_approved: monto <= user_balance + user_cashback,
 				payment_plans,
 				cashback_to_earn,
 				balance_disponible: user_balance,
