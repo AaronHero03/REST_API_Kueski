@@ -22,8 +22,8 @@ REST API built with Express.js that simulates a fintech backend. Covers authenti
 ├── routes/
 │   ├── auth.routes.js
 │   ├── users.routes.js
-│   └── commerce.routes.js
-└── postman/                # Postman collection and environment
+└── └── commerce.routes.js
+
 ```
 
 ## Getting Started
@@ -54,11 +54,12 @@ Server runs on `http://localhost:3000`.
 
 ### Auth
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/auth/login` | No | Login and receive a JWT |
+| Method | Endpoint      | Auth | Description             |
+| ------ | ------------- | ---- | ----------------------- |
+| POST   | `/auth/login` | No   | Login and receive a JWT |
 
 **POST /auth/login**
+
 ```json
 // Request body
 { "email": "valeria@kueski.com", "password": "kueski123" }
@@ -71,21 +72,22 @@ Server runs on `http://localhost:3000`.
 
 ### Users — requires `Authorization: Bearer <token>`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/users/me/dashboard` | Balance and cashback |
-| GET | `/users/loans` | Active loans summary |
+| Method | Endpoint              | Description          |
+| ------ | --------------------- | -------------------- |
+| GET    | `/users/me/dashboard` | Balance and cashback |
+| GET    | `/users/loans`        | Active loans summary |
 
 ---
 
 ### Commerce — requires `Authorization: Bearer <token>`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/commerce/benefits?domain=` | Check if a domain is a partner |
-| POST | `/commerce/transactions/simulate` | Simulate a purchase with payment plans |
+| Method | Endpoint                          | Description                            |
+| ------ | --------------------------------- | -------------------------------------- |
+| GET    | `/commerce/benefits?domain=`      | Check if a domain is a partner         |
+| POST   | `/commerce/transactions/simulate` | Simulate a purchase with payment plans |
 
 **POST /commerce/transactions/simulate**
+
 ```json
 // Request body
 { "monto": 1500, "id_partner": "store_001" }
@@ -102,11 +104,7 @@ Server runs on `http://localhost:3000`.
 
 ## Test Credentials
 
-| Email | Password |
-|-------|----------|
+| Email              | Password  |
+| ------------------ | --------- |
 | valeria@kueski.com | kueski123 |
-| carlos@kueski.com | kueski456 |
-
-## Postman
-
-Import the collection and environment from the `postman/` folder. Run **POST Login** first — it automatically saves the token to `{{authToken}}` for use in subsequent requests.
+| carlos@kueski.com  | kueski456 |
