@@ -108,7 +108,3 @@ Server runs on `http://localhost:3000`.
 | ------------------ | --------- |
 | valeria@kueski.com | kueski123 |
 | carlos@kueski.com  | kueski456 |
-
-## Postman
-
-Import the collection and environment from the `postman/` folder. Run **POST Login** first — it automatically saves the token to `{{authToken}}` for use in subsequent requests.
