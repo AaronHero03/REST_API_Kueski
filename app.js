@@ -1,3 +1,4 @@
+import "dotenv/config";
 import createError from "http-errors";
 import express from "express";
 import path from "path";
@@ -9,6 +10,7 @@ import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.routes.js";
 import commerceRoutes from "./routes/commerce.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import { authMiddleware } from "./middleware/auth.middleware.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,8 +29,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", indexRouter);
 
 app.use("/auth", authRoutes);
-app.use("/users", usersRouter);
-app.use("/commerce", commerceRoutes);
+app.use("/users", authMiddleware, usersRouter);
+app.use("/commerce", authMiddleware, commerceRoutes);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

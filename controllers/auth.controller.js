@@ -1,24 +1,18 @@
-// src/controllers/auth.controller.js
+import jwt from "jsonwebtoken";
+import "dotenv/config";
 
 const CLIENTES_DB = {
 	"valeria@kueski.com": {
 		id_cliente: "user_0001",
 		nombre: "Valeria Mercado",
 		password: "kueski123",
-		token_session: "mock-jwt-token-abc123",
 	},
 	"carlos@kueski.com": {
 		id_cliente: "user_0002",
 		nombre: "Carlos Hernández",
 		password: "kueski456",
-		token_session: "mock-jwt-token-xyz789",
 	},
 };
-
-const VALID_TOKENS = new Set([
-	"mock-jwt-token-abc123",
-	"mock-jwt-token-xyz789",
-]);
 
 const login = (req, res) => {
 	try {
@@ -40,10 +34,16 @@ const login = (req, res) => {
 			});
 		}
 
+		const token = jwt.sign(
+			{ id_cliente: cliente.id_cliente, email },
+			process.env.JWT_SECRET,
+			{ expiresIn: "2h" }
+		);
+
 		res.status(200).json({
 			status: "success",
 			data: {
-				token: cliente.token_session,
+				token,
 				user: {
 					id_cliente: cliente.id_cliente,
 					nombre: cliente.nombre,
@@ -57,23 +57,4 @@ const login = (req, res) => {
 	}
 };
 
-const verifyToken = (req, res) => {
-	try {
-		const authHeader = req.headers["authorization"];
-		const token = authHeader && authHeader.split(" ")[1];
-
-		if (!token || !VALID_TOKENS.has(token)) {
-			return res.status(401).json({
-				status: "error",
-				message: "La sesión ha expirado.",
-			});
-		}
-
-		res.status(200).json({ status: "success", is_valid: true });
-	} catch (error) {
-		console.error("Error en verifyToken:", error);
-		res.status(500).json({ status: "error", message: "Error interno del servidor" });
-	}
-};
-
-export { login, verifyToken };
+export { login };
