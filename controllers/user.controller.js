@@ -43,12 +43,16 @@ const LOANS_DB = {
 };
 
 const getUserDashboard = (req, res) => {
-	const usuario = USERS_DB["user_0001"];
+	const { id_cliente } = req.user;
+	const usuario = USERS_DB[id_cliente];
 
 	if (!usuario) {
 		return res
 			.status(404)
-			.json({ status: "error", message: "No se encontró el perfil del usuario." });
+			.json({
+				status: "error",
+				message: "No se encontró el perfil del usuario.",
+			});
 	}
 
 	res.status(200).json({
@@ -61,12 +65,16 @@ const getUserDashboard = (req, res) => {
 };
 
 const getUserLoans = (req, res) => {
-	const data = LOANS_DB["user_0001"];
+	const { id_cliente } = req.user;
+	const data = LOANS_DB[id_cliente];
 
 	if (!data) {
 		return res
 			.status(404)
-			.json({ status: "error", message: "No se encontraron créditos para este usuario." });
+			.json({
+				status: "error",
+				message: "No se encontraron créditos para este usuario.",
+			});
 	}
 
 	res.status(200).json({
