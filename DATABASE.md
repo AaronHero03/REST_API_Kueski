@@ -4,7 +4,7 @@ SQL queries used by each endpoint, and the entity-relationship diagram for `kues
 
 ---
 
-## Entity-Relationship Diagram (Crow's Foot)
+## Entity-Relationship Diagram (Crow's Foot Notation)
 
 ```mermaid
 erDiagram
@@ -94,50 +94,50 @@ erDiagram
 
 ## Queries by Functional Requirement
 
-### FR-1 · Autenticación — `POST /auth/login`
+### FR-1 · Authentication — `POST /auth/login`
 
-Valida las credenciales del cliente y retorna el JWT de sesión.
+Validates client credentials and returns a signed JWT.
 
 ```sql
--- Busca al cliente por email para verificar credenciales
+-- Fetch client by email to verify credentials
 SELECT id_cliente, nombre, email, password
 FROM cliente
 WHERE email = ?;
 ```
 
-**Tablas:** `cliente`
-**Resultado esperado:** 1 fila. Si no existe o el password no coincide → 401.
+**Tables:** `cliente`
+**Expected result:** 1 row. No match or wrong password → 401.
 
 ---
 
-### FR-2 · Dashboard del usuario — `GET /users/me/dashboard`
+### FR-2 · User Dashboard — `GET /users/me/dashboard`
 
-Retorna el saldo disponible de la cuenta activa y el cashback aprobado del cliente autenticado.
+Returns the available balance from the active account and the approved cashback for the authenticated client.
 
 ```sql
--- Saldo de la cuenta activa del cliente
+-- Balance from the client's active account
 SELECT saldo
 FROM cuenta
 WHERE id_cliente = ? AND estado = 'ACTIVA';
 ```
 
 ```sql
--- Cashback aprobado disponible del cliente
+-- Approved cashback available to the client
 SELECT monto_aprobado
 FROM cashback
 WHERE id_cliente = ?;
 ```
 
-Ambas queries se ejecutan en paralelo (`Promise.all`).
+Both queries run in parallel (`Promise.all`).
 
-**Tablas:** `cuenta`, `cashback`
-**Resultado esperado:** Al menos 1 fila en `cuenta`; la fila en `cashback` es opcional (default 0 si no existe).
+**Tables:** `cuenta`, `cashback`
+**Expected result:** At least 1 row in `cuenta`; the `cashback` row is optional (defaults to 0 if absent).
 
 ---
 
-### FR-3 · Préstamos activos — `GET /users/loans`
+### FR-3 · Active Loans — `GET /users/loans`
 
-Lista todos los préstamos activos del cliente con su monto, tasa, cuotas y fecha de vencimiento.
+Lists all active loans for the client with amount, rate, installments, and due date.
 
 ```sql
 SELECT
@@ -154,59 +154,59 @@ WHERE sp.id_cliente = ?
 ORDER BY sp.fecha_fin ASC;
 ```
 
-**Tablas:** `prestamo`, `solicitud_prestamo`
+**Tables:** `prestamo`, `solicitud_prestamo`
 **Join:** `prestamo.id_solicitud = solicitud_prestamo.id_soliPres`
-**Ordenamiento:** por fecha de vencimiento más próxima primero.
-**Resultado esperado:** 0 o más filas; 0 filas → 404.
+**Order:** by nearest due date first.
+**Expected result:** 0 or more rows; 0 rows → 404.
 
 ---
 
-### FR-4 · Verificar beneficios de tienda — `GET /commerce/benefits?domain=`
+### FR-4 · Check Store Benefits — `GET /commerce/benefits?domain=`
 
-Comprueba si un dominio pertenece a una tienda partner y retorna su porcentaje de cashback.
+Checks whether a domain belongs to a partner store and returns its cashback rate.
 
 ```sql
--- Verifica si el dominio es de un partner y obtiene su tasa de cashback
+-- Verify if the domain is a partner and retrieve its cashback rate
 SELECT cashback_rate
 FROM tiendas_partner
 WHERE dominio = ?;
 ```
 
-**Tablas:** `tiendas_partner`
-**Resultado esperado:** 1 fila → `is_partner: true`; 0 filas → `is_partner: false`.
+**Tables:** `tiendas_partner`
+**Expected result:** 1 row → `is_partner: true`; 0 rows → `is_partner: false`.
 
 ---
 
-### FR-5 · Simular transacción — `POST /commerce/transactions/simulate`
+### FR-5 · Simulate Transaction — `POST /commerce/transactions/simulate`
 
-Calcula planes de pago en cuotas para un monto dado, considerando saldo y cashback disponibles del cliente, y el cashback que se ganaría en el partner.
+Calculates installment payment plans for a given amount, taking into account the client's balance, available cashback, and the cashback rate of the partner store.
 
 ```sql
--- Saldo de la cuenta activa del cliente
+-- Balance from the client's active account
 SELECT saldo
 FROM cuenta
 WHERE id_cliente = ? AND estado = 'ACTIVA';
 ```
 
 ```sql
--- Cashback aprobado disponible del cliente
+-- Approved cashback available to the client
 SELECT monto_aprobado
 FROM cashback
 WHERE id_cliente = ?;
 ```
 
 ```sql
--- Tasa de cashback del partner por id
+-- Cashback rate for the partner store by id
 SELECT cashback_rate
 FROM tiendas_partner
 WHERE id_partner = ?;
 ```
 
-Las tres queries se ejecutan en paralelo (`Promise.all`).
+All three queries run in parallel (`Promise.all`).
 
-**Tablas:** `cuenta`, `cashback`, `tiendas_partner`
-**Lógica de negocio aplicada sobre los resultados:**
+**Tables:** `cuenta`, `cashback`, `tiendas_partner`
+**Business logic applied over the results:**
 
 - `is_approved`: `monto <= saldo + cashback_aprobado`
 - `cashback_to_earn`: `monto × (cashback_rate / 100)`
-- Planes de pago: cuotas a 3, 6 y 12 meses con tasa anual del 8% (mensual compuesto).
+- Payment plans: 3, 6, and 12 monthly installments at 8% annual rate (monthly compound interest).
