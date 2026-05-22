@@ -1,0 +1,133 @@
+$kind: http-request
+name: POST Simulate Transaction
+method: POST
+url: '{{baseUrl}}/commerce/transactions/simulate'
+order: 2000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "monto": 1500,
+      "id_partner": "store_001"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      var jsonData = pm.response.json();
+
+      // ✅ Happy path tests (status 200)
+      if (pm.response.code === 200) {
+          pm.test("✅ [200] Status code is 200", function () {
+              pm.response.to.have.status(200);
+          });
+
+          pm.test("✅ [200] Response has status 'success'", function () {
+              pm.expect(jsonData.status).to.eql("success");
+          });
+
+          pm.test("✅ [200] Response time is below 1500ms", function () {
+              pm.expect(pm.response.responseTime).to.be.below(1500);
+          });
+
+          pm.test("✅ [200] Content-Type is application/json", function () {
+              pm.response.to.have.header("Content-Type");
+              pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+          });
+
+          pm.test("✅ [200] data.is_approved is a boolean", function () {
+              pm.expect(jsonData.data).to.have.property("is_approved");
+              pm.expect(jsonData.data.is_approved).to.be.a("boolean");
+          });
+
+          pm.test("✅ [200] data.payment_plans is an array with 3 items", function () {
+              pm.expect(jsonData.data).to.have.property("payment_plans");
+              pm.expect(jsonData.data.payment_plans).to.be.an("array");
+              pm.expect(jsonData.data.payment_plans.length).to.eql(3);
+          });
+
+          pm.test("✅ [200] Each payment plan has cuotas, monto_cuota, and total", function () {
+              jsonData.data.payment_plans.forEach(function (plan) {
+                  pm.expect(plan).to.have.property("cuotas");
+                  pm.expect(plan).to.have.property("monto_cuota");
+                  pm.expect(plan).to.have.property("total");
+                  pm.expect(plan.cuotas).to.be.a("number");
+                  pm.expect(plan.monto_cuota).to.be.a("number");
+                  pm.expect(plan.total).to.be.a("number");
+              });
+          });
+
+          pm.test("✅ [200] data.cashback_to_earn is a non-negative number", function () {
+              pm.expect(jsonData.data).to.have.property("cashback_to_earn");
+              pm.expect(jsonData.data.cashback_to_earn).to.be.a("number");
+              pm.expect(jsonData.data.cashback_to_earn).to.be.at.least(0);
+          });
+
+          pm.test("✅ [200] data.balance_disponible is a non-negative number", function () {
+              pm.expect(jsonData.data).to.have.property("balance_disponible");
+              pm.expect(jsonData.data.balance_disponible).to.be.a("number");
+              pm.expect(jsonData.data.balance_disponible).to.be.at.least(0);
+          });
+
+          pm.test("✅ [200] data.cashback_disponible is a non-negative number", function () {
+              pm.expect(jsonData.data).to.have.property("cashback_disponible");
+              pm.expect(jsonData.data.cashback_disponible).to.be.a("number");
+              pm.expect(jsonData.data.cashback_disponible).to.be.at.least(0);
+          });
+
+          pm.test("✅ [200] payment_plans totals are greater than monto_cuota", function () {
+              jsonData.data.payment_plans.forEach(function (plan) {
+                  pm.expect(plan.total).to.be.at.least(plan.monto_cuota);
+              });
+          });
+      }
+
+      // ❌ Fail path: missing required fields (400)
+      if (pm.response.code === 400) {
+          pm.test("❌ [400] Status code is 400 for missing fields", function () {
+              pm.response.to.have.status(400);
+          });
+
+          pm.test("❌ [400] Response has status 'error'", function () {
+              pm.expect(jsonData.status).to.eql("error");
+          });
+
+          pm.test("❌ [400] Response has validation error message", function () {
+              pm.expect(jsonData).to.have.property("message");
+              pm.expect(jsonData.message).to.be.a("string");
+          });
+      }
+
+      // ❌ Fail path: unauthorized (401)
+      if (pm.response.code === 401) {
+          pm.test("❌ [401] Status code is 401 - unauthorized", function () {
+              pm.response.to.have.status(401);
+          });
+
+          pm.test("❌ [401] Response has status 'error'", function () {
+              pm.expect(jsonData.status).to.eql("error");
+          });
+      }
+
+      // ❌ Fail path: insufficient balance (422)
+      if (pm.response.code === 422) {
+          pm.test("❌ [422] Status code is 422 - unprocessable entity", function () {
+              pm.response.to.have.status(422);
+          });
+
+          pm.test("❌ [422] Response has status 'error'", function () {
+              pm.expect(jsonData.status).to.eql("error");
+          });
+
+          pm.test("❌ [422] Response has error message", function () {
+              pm.expect(jsonData).to.have.property("message");
+          });
+      }

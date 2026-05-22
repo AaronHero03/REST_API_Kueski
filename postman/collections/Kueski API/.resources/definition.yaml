@@ -1,0 +1,7 @@
+$kind: collection
+name: Kueski API
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+  - key: authToken
+    value: ''
