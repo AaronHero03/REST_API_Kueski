@@ -1,20 +1,8 @@
 import jwt from "jsonwebtoken";
 import "dotenv/config";
+import db from "../config/database.js";
 
-const CLIENTES_DB = {
-	"valeria@kueski.com": {
-		id_cliente: "user_0001",
-		nombre: "Valeria Mercado",
-		password: "kueski123",
-	},
-	"carlos@kueski.com": {
-		id_cliente: "user_0002",
-		nombre: "Carlos Hernández",
-		password: "kueski456",
-	},
-};
-
-const login = (req, res) => {
+const login = async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
@@ -25,7 +13,12 @@ const login = (req, res) => {
 			});
 		}
 
-		const cliente = CLIENTES_DB[email.toLowerCase()];
+		const [rows] = await db.execute(
+			"SELECT id_cliente, nombre, email, password FROM cliente WHERE email = ?",
+			[email.trim().toLowerCase()]
+		);
+
+		const cliente = rows[0];
 
 		if (!cliente || cliente.password !== password) {
 			return res.status(401).json({
@@ -35,7 +28,7 @@ const login = (req, res) => {
 		}
 
 		const token = jwt.sign(
-			{ id_cliente: cliente.id_cliente, email },
+			{ id_cliente: cliente.id_cliente, email: cliente.email },
 			process.env.JWT_SECRET,
 			{ expiresIn: "2h" }
 		);
@@ -47,7 +40,7 @@ const login = (req, res) => {
 				user: {
 					id_cliente: cliente.id_cliente,
 					nombre: cliente.nombre,
-					email,
+					email: cliente.email,
 				},
 			},
 		});

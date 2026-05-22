@@ -1,89 +1,74 @@
-// src/controllers/users.controller.js
+import db from "../config/database.js";
 
-const USERS_DB = {
-	user_0001: {
-		balance: 12500.5,
-		cashback_accumulated: 450.25,
-		currency: "MXN",
-	},
-};
+const getUserDashboard = async (req, res) => {
+	try {
+		const { id_cliente } = req.user;
 
-const LOANS_DB = {
-	user_0001: {
-		summary: {
-			total_active: 2,
-			total_pending: 3250.0,
-			next_due_date: "2026-06-01",
-		},
-		active_loans: [
-			{
-				id_prestamo: "loan_001",
-				cantidad: 5000.0,
-				tasa: 0.08,
-				cuotas: 6,
-				cuotas_pagadas: 2,
-				fecha_aprobacion: "2026-01-15",
-				fecha_fin: "2026-07-15",
-				monto_cuota: 883.33,
-				proximo_pago: "2026-06-01",
+		const [[cuenta], [cashback]] = await Promise.all([
+			db.execute(
+				"SELECT saldo FROM cuenta WHERE id_cliente = ? AND estado = 'ACTIVA'",
+				[id_cliente]
+			),
+			db.execute(
+				"SELECT monto_aprobado FROM cashback WHERE id_cliente = ?",
+				[id_cliente]
+			),
+		]);
+
+		if (!cuenta[0]) {
+			return res.status(404).json({ status: "error", message: "No se encontró el perfil del usuario." });
+		}
+
+		res.status(200).json({
+			status: "success",
+			data: {
+				balance: { available: cuenta[0].saldo, currency: "MXN" },
+				cashback: { available: cashback[0]?.monto_aprobado ?? 0 },
 			},
-			{
-				id_prestamo: "loan_002",
-				cantidad: 2500.0,
-				tasa: 0.06,
-				cuotas: 3,
-				cuotas_pagadas: 1,
-				fecha_aprobacion: "2026-03-10",
-				fecha_fin: "2026-06-10",
-				monto_cuota: 883.33,
-				proximo_pago: "2026-06-10",
-			},
-		],
-	},
+		});
+	} catch (error) {
+		console.error("Error en getUserDashboard:", error);
+		res.status(500).json({ status: "error", message: "Error interno del servidor" });
+	}
 };
 
-const getUserDashboard = (req, res) => {
-	const { id_cliente } = req.user;
-	const usuario = USERS_DB[id_cliente];
+const getUserLoans = async (req, res) => {
+	try {
+		const { id_cliente } = req.user;
 
-	if (!usuario) {
-		return res
-			.status(404)
-			.json({
-				status: "error",
-				message: "No se encontró el perfil del usuario.",
-			});
+		const [loans] = await db.execute(
+			`SELECT
+				p.id_prestamo,
+				sp.cantidad,
+				p.tasa,
+				p.cuotas,
+				p.created_at AS fecha_aprobacion,
+				sp.fecha_fin
+			FROM prestamo p
+			JOIN solicitud_prestamo sp ON p.id_solicitud = sp.id_soliPres
+			WHERE sp.id_cliente = ? AND p.estado = 'ACTIVO'
+			ORDER BY sp.fecha_fin ASC`,
+			[id_cliente]
+		);
+
+		if (!loans.length) {
+			return res.status(404).json({ status: "error", message: "No se encontraron créditos para este usuario." });
+		}
+
+		const summary = {
+			total_active: loans.length,
+			total_pending: loans.reduce((sum, l) => sum + Number(l.cantidad), 0),
+			next_due_date: loans[0].fecha_fin,
+		};
+
+		res.status(200).json({
+			status: "success",
+			data: { summary, active_loans: loans },
+		});
+	} catch (error) {
+		console.error("Error en getUserLoans:", error);
+		res.status(500).json({ status: "error", message: "Error interno del servidor" });
 	}
-
-	res.status(200).json({
-		status: "success",
-		data: {
-			balance: { available: usuario.balance, currency: usuario.currency },
-			cashback: { available: usuario.cashback_accumulated },
-		},
-	});
-};
-
-const getUserLoans = (req, res) => {
-	const { id_cliente } = req.user;
-	const data = LOANS_DB[id_cliente];
-
-	if (!data) {
-		return res
-			.status(404)
-			.json({
-				status: "error",
-				message: "No se encontraron créditos para este usuario.",
-			});
-	}
-
-	res.status(200).json({
-		status: "success",
-		data: {
-			summary: data.summary,
-			active_loans: data.active_loans,
-		},
-	});
 };
 
 export { getUserDashboard, getUserLoans };
