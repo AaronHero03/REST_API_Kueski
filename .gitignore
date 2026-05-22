@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 .postman/
-postman/
 
 # Environment variables
 .env

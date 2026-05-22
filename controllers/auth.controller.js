@@ -14,8 +14,8 @@ const login = async (req, res) => {
 		}
 
 		const [rows] = await db.execute(
-			"SELECT id_cliente, nombre, email, password FROM CLIENTE WHERE email = ?",
-			[email.toLowerCase()]
+			"SELECT id_cliente, nombre, email, password FROM cliente WHERE email = ?",
+			[email.trim().toLowerCase()]
 		);
 
 		const cliente = rows[0];

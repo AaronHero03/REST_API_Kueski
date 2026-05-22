@@ -1,21 +1,19 @@
 $kind: http-request
 name: POST Login
 method: POST
-url: '{{baseUrl}}/auth/login'
+url: "{{baseUrl}}/auth/login"
 order: 1000
 headers:
-  - key: Content-Type
-    value: application/json
+  Content-Type: application/json
 body:
   type: json
   content: |-
     {
-      "email": "valeria@kueski.com",
-      "password": "kueski123"
+      "email": "ana.garcia@gmail.com ",
+      "password": "hashed_pass_001"
     }
 scripts:
   - type: afterResponse
-    language: text/javascript
     code: |-
       var jsonData = pm.response.json();
 
@@ -104,3 +102,4 @@ scripts:
               pm.response.to.have.status(500);
           });
       }
+    language: text/javascript

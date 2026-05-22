@@ -6,11 +6,11 @@ const getUserDashboard = async (req, res) => {
 
 		const [[cuenta], [cashback]] = await Promise.all([
 			db.execute(
-				"SELECT saldo FROM CUENTA WHERE id_cliente = ? AND estado = 'activo'",
+				"SELECT saldo FROM cuenta WHERE id_cliente = ? AND estado = 'ACTIVA'",
 				[id_cliente]
 			),
 			db.execute(
-				"SELECT monto_aprobado FROM BALANCE_CASHBACK WHERE id_cliente = ?",
+				"SELECT monto_aprobado FROM cashback WHERE id_cliente = ?",
 				[id_cliente]
 			),
 		]);
@@ -42,12 +42,12 @@ const getUserLoans = async (req, res) => {
 				sp.cantidad,
 				p.tasa,
 				p.cuotas,
-				p.fecha_aprobacion,
-				p.fecha_fin
-			FROM PRESTAMO p
-			JOIN SOLICITUD_PRESTAMO sp ON p.id_solicitud = sp.id_solicitud
-			WHERE sp.id_cliente = ? AND sp.estado = 'activo'
-			ORDER BY p.fecha_fin ASC`,
+				p.created_at AS fecha_aprobacion,
+				sp.fecha_fin
+			FROM prestamo p
+			JOIN solicitud_prestamo sp ON p.id_solicitud = sp.id_soliPres
+			WHERE sp.id_cliente = ? AND p.estado = 'ACTIVO'
+			ORDER BY sp.fecha_fin ASC`,
 			[id_cliente]
 		);
 

@@ -12,7 +12,7 @@ const checkBenefits = async (req, res) => {
 		}
 
 		const [rows] = await db.execute(
-			"SELECT cashback_rate FROM TIENDAS_PARTNER WHERE dominio = ?",
+			"SELECT cashback_rate FROM tiendas_partner WHERE dominio = ?",
 			[domain.toLowerCase()]
 		);
 
@@ -44,15 +44,15 @@ const simulateTransaction = async (req, res) => {
 
 		const [[cuentaRows], [cashbackRows], [partnerRows]] = await Promise.all([
 			db.execute(
-				"SELECT saldo FROM CUENTA WHERE id_cliente = ? AND estado = 'activo'",
+				"SELECT saldo FROM cuenta WHERE id_cliente = ? AND estado = 'ACTIVA'",
 				[id_cliente]
 			),
 			db.execute(
-				"SELECT monto_aprobado FROM BALANCE_CASHBACK WHERE id_cliente = ?",
+				"SELECT monto_aprobado FROM cashback WHERE id_cliente = ?",
 				[id_cliente]
 			),
 			db.execute(
-				"SELECT cashback_rate FROM TIENDAS_PARTNER WHERE id_partner = ?",
+				"SELECT cashback_rate FROM tiendas_partner WHERE id_partner = ?",
 				[id_partner]
 			),
 		]);
