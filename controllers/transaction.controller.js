@@ -2,7 +2,7 @@ import db from "../config/database.js";
 
 const trackIntent = async (req, res) => {
 	try {
-		const id_cliente = req.user_id_cliente;
+		const id_cliente = req.user.id_cliente;
 		const { monto, id_partner, url } = req.body;
 
 		if (!monto || !id_partner || !url) {
@@ -17,7 +17,7 @@ const trackIntent = async (req, res) => {
 			[id_partner],
 		);
 
-		if (partners.lenght == 0) {
+		if (partners.length === 0) {
 			return res.status(404).json({
 				status: "error",
 				message: "La tienda partner no fue encontrada",
@@ -25,7 +25,7 @@ const trackIntent = async (req, res) => {
 		}
 
 		const cashback_rate = partners[0].cashback_rate;
-		const cantidad_CB = parseFloat(monto * (cashback_rate / 100)).toFixed(2);
+		const cantidad_CB = parseFloat((monto * (cashback_rate / 100)).toFixed(2));
 
 		const [txResult] = await db.execute(
 			"INSERT INTO transaccion (id_cliente, id_partner, monto, fecha, estado) VALUES (?, ?, ?, NOW(), 'pendiente')",
@@ -56,7 +56,7 @@ const trackIntent = async (req, res) => {
 };
 
 const confirmTransaction = async (req, res) => {
-	const id_cliente = req.user_id_cliente;
+	const id_cliente = req.user.id_cliente;
 	const id_transaccion = req.params.id;
 
 	let connection;

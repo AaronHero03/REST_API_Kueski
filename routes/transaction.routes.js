@@ -1,8 +1,14 @@
 import express from "express";
-import { trackIntent } from "../controllers/transaction.controller";
+import {
+	trackIntent,
+	confirmTransaction,
+} from "../controllers/transaction.controller.js";
+import { simulateTransaction } from "../controllers/commerce.controller.js";
+
 var router = express.Router();
 
-router.get("/", trackIntent);
-router.get("/:id/confirm", confirmTransaction);
+router.post("/simulate", simulateTransaction);
+router.post("/", trackIntent);
+router.post("/:id/confirm", confirmTransaction);
 
 export default router;
