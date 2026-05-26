@@ -15,7 +15,7 @@ const login = async (req, res) => {
 
 		const [rows] = await db.execute(
 			"SELECT id_cliente, nombre, email, password FROM cliente WHERE email = ?",
-			[email.trim().toLowerCase()]
+			[email.trim().toLowerCase()],
 		);
 
 		const cliente = rows[0];
@@ -30,7 +30,7 @@ const login = async (req, res) => {
 		const token = jwt.sign(
 			{ id_cliente: cliente.id_cliente, email: cliente.email },
 			process.env.JWT_SECRET,
-			{ expiresIn: "2h" }
+			{ expiresIn: "2h" },
 		);
 
 		res.status(200).json({
@@ -46,8 +46,14 @@ const login = async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Error en login:", error);
-		res.status(500).json({ status: "error", message: "Error interno del servidor" });
+		res
+			.status(500)
+			.json({ status: "error", message: "Error interno del servidor" });
 	}
 };
 
-export { login };
+const verify = (req, res) => {
+	res.status(200).json({ status: "success", is_valid: true });
+};
+
+export { login, verify };

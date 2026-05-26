@@ -10,6 +10,7 @@ import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.routes.js";
 import commerceRoutes from "./routes/commerce.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import transactionsRoutes from "./routes/transaction.routes.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,7 @@ app.use("/", indexRouter);
 app.use("/auth", authRoutes);
 app.use("/users", authMiddleware, usersRouter);
 app.use("/commerce", authMiddleware, commerceRoutes);
+app.use("/transactions", authMiddleware, transactionsRoutes);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
