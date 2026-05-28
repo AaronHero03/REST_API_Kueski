@@ -31,7 +31,7 @@ app.use("/", indexRouter);
 
 app.use("/auth", authRoutes);
 app.use("/users", authMiddleware, usersRouter);
-app.use("/commerce", authMiddleware, commerceRoutes);
+app.use("/commerce", commerceRoutes);
 app.use("/transactions", authMiddleware, transactionsRoutes);
 
 // catch 404 and forward to error handler

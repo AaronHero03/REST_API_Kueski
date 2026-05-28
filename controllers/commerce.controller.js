@@ -12,7 +12,7 @@ const checkBenefits = async (req, res) => {
 		}
 
 		const [rows] = await db.execute(
-			"SELECT cashback_rate FROM tiendas_partner WHERE dominio = ?",
+			"SELECT id_partner, cashback_rate FROM tiendas_partner WHERE dominio = ?",
 			[domain.toLowerCase()]
 		);
 
@@ -22,7 +22,11 @@ const checkBenefits = async (req, res) => {
 
 		res.status(200).json({
 			status: "success",
-			data: { is_partner: true, cashback_percentage: rows[0].cashback_rate },
+			data: {
+				is_partner: true,
+				id_partner: rows[0].id_partner,
+				cashback_percentage: rows[0].cashback_rate,
+			},
 		});
 	} catch (error) {
 		console.error("Error en checkBenefits:", error);
