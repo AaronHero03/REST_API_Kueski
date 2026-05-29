@@ -29,7 +29,7 @@ INSERT INTO tiendas_partner (nombre, dominio, cashback_rate) VALUES
   ('Walmart México', 'walmart.com.mx',        2.00),
   ('Coppel',         'coppel.com',            3.50);
 
--- 2. Clientes (password: Kueski2024!)
+-- 2. Clientes
 INSERT INTO cliente (nombre, email, password) VALUES
   ('Carlos Mendoza Ríos',   'carlos.mendoza@gmail.com', 'Kueski2024!'),
   ('María García López',    'maria.garcia@hotmail.com', 'Kueski2024!'),
