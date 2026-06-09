@@ -1,10 +1,10 @@
 # Database Reference
 
-SQL queries used by each endpoint, and the entity-relationship diagram for `kueski_db`.
+Schema, entity-relationship diagram, and SQL queries for `kueski_db` (MySQL 8).
 
 ---
 
-## Entity-Relationship Diagram (Crow's Foot Notation)
+## Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -79,65 +79,72 @@ erDiagram
         timestamp fecha_aprobacion
     }
 
-    cliente ||--o{ cuenta : "tiene"
-    cliente ||--o| cashback : "acumula"
-    cliente ||--o{ solicitud_prestamo : "solicita"
-    solicitud_prestamo ||--o| prestamo : "genera"
-    cliente ||--o{ transaccion : "realiza"
-    tiendas_partner ||--o{ transaccion : "involucrada en"
-    transaccion ||--o{ solicitud_cb : "origina"
-    solicitud_cb ||--o{ aprobacion_cb : "resulta en"
-    transaccion ||--o{ aprobacion_cb : "referenciada en"
+    cliente ||--o{ cuenta : "has"
+    cliente ||--o| cashback : "accumulates"
+    cliente ||--o{ solicitud_prestamo : "requests"
+    solicitud_prestamo ||--o| prestamo : "generates"
+    cliente ||--o{ transaccion : "makes"
+    tiendas_partner ||--o{ transaccion : "involved in"
+    transaccion ||--o{ solicitud_cb : "originates"
+    solicitud_cb ||--o{ aprobacion_cb : "results in"
+    transaccion ||--o{ aprobacion_cb : "referenced in"
 ```
 
 ---
 
-## Queries by Functional Requirement
+## Table Descriptions
 
-### FR-1 · Authentication — `POST /auth/login`
+| Table | Purpose |
+| --- | --- |
+| `cliente` | Registered users. Holds credentials and personal data. |
+| `cuenta` | Each client has one active account with a MXN balance. |
+| `cashback` | Tracks pending and approved cashback per client. One row per client (`UNIQUE id_cliente`). |
+| `solicitud_prestamo` | Loan applications (pending / approved / rejected). |
+| `prestamo` | Approved loans linked to a `solicitud_prestamo`. Tracks installments, rate, and status. |
+| `tiendas_partner` | Partner stores recognized by the extension. Stores domain and cashback rate. |
+| `transaccion` | Records every purchase made through KueskiPay. Status: `pendiente → aprobado`. |
+| `solicitud_cb` | Cashback request linked to a transaction. Created when a purchase intent is registered. |
+| `aprobacion_cb` | Audit record created when a cashback request is approved and credited. |
 
-Validates client credentials and returns a signed JWT.
+---
+
+## Queries by Endpoint
+
+### `POST /auth/login`
 
 ```sql
--- Fetch client by email to verify credentials
 SELECT id_cliente, nombre, email, password
 FROM cliente
 WHERE email = ?;
 ```
 
-**Tables:** `cliente`
-**Expected result:** 1 row. No match or wrong password → 401.
+**Tables:** `cliente` · **Result:** 1 row expected. No match or wrong password → 401.
 
 ---
 
-### FR-2 · User Dashboard — `GET /users/me/dashboard`
+### `GET /users/me/dashboard`
 
-Returns the available balance from the active account and the approved cashback for the authenticated client.
+Both queries run in parallel via `Promise.all`.
 
 ```sql
--- Balance from the client's active account
+-- Available balance from the client's active account
 SELECT saldo
 FROM cuenta
 WHERE id_cliente = ? AND estado = 'ACTIVA';
 ```
 
 ```sql
--- Approved cashback available to the client
+-- Approved cashback available to spend
 SELECT monto_aprobado
 FROM cashback
 WHERE id_cliente = ?;
 ```
 
-Both queries run in parallel (`Promise.all`).
-
-**Tables:** `cuenta`, `cashback`
-**Expected result:** At least 1 row in `cuenta`; the `cashback` row is optional (defaults to 0 if absent).
+**Tables:** `cuenta`, `cashback` · **Note:** The `cashback` row may not exist — defaults to 0.
 
 ---
 
-### FR-3 · Active Loans — `GET /users/loans`
-
-Lists all active loans for the client with amount, rate, installments, and due date.
+### `GET /users/loans`
 
 ```sql
 SELECT
@@ -154,59 +161,106 @@ WHERE sp.id_cliente = ?
 ORDER BY sp.fecha_fin ASC;
 ```
 
-**Tables:** `prestamo`, `solicitud_prestamo`
-**Join:** `prestamo.id_solicitud = solicitud_prestamo.id_soliPres`
-**Order:** by nearest due date first.
-**Expected result:** 0 or more rows; 0 rows → 404.
+**Tables:** `prestamo`, `solicitud_prestamo` · **Result:** Ordered by nearest due date. 0 rows → 404.
 
 ---
 
-### FR-4 · Check Store Benefits — `GET /commerce/benefits?domain=`
-
-Checks whether a domain belongs to a partner store and returns its cashback rate.
+### `GET /commerce/benefits`
 
 ```sql
--- Verify if the domain is a partner and retrieve its cashback rate
-SELECT cashback_rate
+SELECT id_partner, cashback_rate
 FROM tiendas_partner
 WHERE dominio = ?;
 ```
 
-**Tables:** `tiendas_partner`
-**Expected result:** 1 row → `is_partner: true`; 0 rows → `is_partner: false`.
+**Tables:** `tiendas_partner` · **Result:** 1 row → `is_partner: true`. 0 rows → `is_partner: false`.
 
 ---
 
-### FR-5 · Simulate Transaction — `POST /commerce/transactions/simulate`
+### `POST /transactions/simulate`
 
-Calculates installment payment plans for a given amount, taking into account the client's balance, available cashback, and the cashback rate of the partner store.
+All three queries run in parallel via `Promise.all`. No rows are written — this is a read-only calculation.
 
 ```sql
--- Balance from the client's active account
-SELECT saldo
-FROM cuenta
-WHERE id_cliente = ? AND estado = 'ACTIVA';
+SELECT saldo FROM cuenta WHERE id_cliente = ? AND estado = 'ACTIVA';
 ```
 
 ```sql
--- Approved cashback available to the client
-SELECT monto_aprobado
-FROM cashback
-WHERE id_cliente = ?;
+SELECT monto_aprobado FROM cashback WHERE id_cliente = ?;
 ```
 
 ```sql
--- Cashback rate for the partner store by id
-SELECT cashback_rate
-FROM tiendas_partner
-WHERE id_partner = ?;
+SELECT cashback_rate FROM tiendas_partner WHERE id_partner = ?;
 ```
 
-All three queries run in parallel (`Promise.all`).
-
-**Tables:** `cuenta`, `cashback`, `tiendas_partner`
 **Business logic applied over the results:**
 
-- `is_approved`: `monto <= saldo + cashback_aprobado`
+- `is_approved`: `monto <= saldo + monto_aprobado`
 - `cashback_to_earn`: `monto × (cashback_rate / 100)`
-- Payment plans: 3, 6, and 12 monthly installments at 8% annual rate (monthly compound interest).
+- Payment plans: 3, 6, and 12 installments at 8% annual interest, compounded monthly
+
+---
+
+### `POST /transactions` (register purchase intent)
+
+```sql
+SELECT cashback_rate FROM tiendas_partner WHERE id_partner = ?;
+```
+
+```sql
+INSERT INTO transaccion (id_cliente, id_partner, monto, fecha, estado)
+VALUES (?, ?, ?, NOW(), 'pendiente');
+```
+
+```sql
+INSERT INTO solicitud_cb (id_transaccion, url, cantidad_CB, estado, created_at)
+VALUES (?, ?, ?, 'pendiente', NOW());
+```
+
+`cantidad_CB = monto × (cashback_rate / 100)`
+
+---
+
+### `POST /transactions/:id/confirm` (atomic — SQL transaction)
+
+Steps 3–6 run inside a `beginTransaction` / `commit` block. If any step fails, all changes are rolled back.
+
+```sql
+-- 1. Verify transaction exists and belongs to this user
+SELECT estado FROM transaccion WHERE id_transaccion = ? AND id_cliente = ?;
+```
+
+```sql
+-- 2. Get the linked cashback request
+SELECT id_SoliCB, cantidad_CB FROM solicitud_cb WHERE id_transaccion = ?;
+```
+
+```sql
+-- 3. Approve the transaction
+UPDATE transaccion SET estado = 'aprobado' WHERE id_transaccion = ?;
+```
+
+```sql
+-- 4. Approve the cashback request
+UPDATE solicitud_cb SET estado = 'aprobado' WHERE id_SoliCB = ?;
+```
+
+```sql
+-- 5. Create the approval audit record
+INSERT INTO aprobacion_cb (id_SoliCB, id_transaccion, cantidad, fecha_aprobacion)
+VALUES (?, ?, ?, NOW());
+```
+
+```sql
+-- 6. Credit cashback to the user (insert on first purchase, add on subsequent ones)
+INSERT INTO cashback (id_cliente, monto_pendiente, monto_aprobado, updated_at)
+VALUES (?, 0, ?, NOW())
+ON DUPLICATE KEY UPDATE
+  monto_aprobado = monto_aprobado + VALUES(monto_aprobado),
+  updated_at = NOW();
+```
+
+```sql
+-- 7. Read the new balance to return in the response
+SELECT monto_aprobado FROM cashback WHERE id_cliente = ?;
+```
